@@ -1,24 +1,26 @@
 package bgu.spl171.net.impl.rci;
 
-import bgu.spl171.net.api.MessagingProtocol;
 import java.io.Serializable;
+
+import bgu.spl171.net.api.MessagingProtocol;
 
 public class RemoteCommandInvocationProtocol<T> implements MessagingProtocol<Serializable> {
 
-    private T arg;
+	private T arg;
 
-    public RemoteCommandInvocationProtocol(T arg) {
-        this.arg = arg;
-    }
+	public RemoteCommandInvocationProtocol(T arg) {
+		this.arg = arg;
+	}
 
-    @Override
-    public Serializable process(Serializable msg) {
-        return ((Command) msg).execute(arg);
-    }
+	@SuppressWarnings("unchecked")
+	@Override
+	public Serializable process(Serializable msg) {
+		return ((Command<T>) msg).execute(this.arg);
+	}
 
-    @Override
-    public boolean shouldTerminate() {
-        return false;
-    }
+	@Override
+	public boolean shouldTerminate() {
+		return false;
+	}
 
 }
