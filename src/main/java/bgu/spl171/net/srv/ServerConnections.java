@@ -7,10 +7,9 @@ import bgu.spl171.net.api.bidi.Connections;
 
 public class ServerConnections<T> implements Connections<T> {
 
-	ConcurrentHashMap<Integer, ConnectionHandler<T>> connections;
+	private ConcurrentHashMap<Integer, ConnectionHandler<T>> connections;
 
 	public ServerConnections() {
-
 		connections = new ConcurrentHashMap<Integer, ConnectionHandler<T>>();
 	}
 
