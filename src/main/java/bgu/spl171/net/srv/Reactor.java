@@ -52,6 +52,7 @@ public class Reactor<T> implements Server<T> {
 
 	@Override
 	public void serve() {
+		this.selectorThread = Thread.currentThread();
 
 		try (Selector selector = Selector.open(); ServerSocketChannel serverSock = ServerSocketChannel.open()) {
 
@@ -111,10 +112,11 @@ public class Reactor<T> implements Server<T> {
 			if (task != null) {
 				this.pool.submit(handler, task);
 			}
-		} else {
-			handler.continueWrite();
 		}
 
+		if (key.isWritable()) {
+			handler.continueWrite();
+		}
 	}
 
 	private void runSelectionThreadTasks() {

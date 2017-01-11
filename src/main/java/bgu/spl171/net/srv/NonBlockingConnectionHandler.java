@@ -2,10 +2,8 @@ package bgu.spl171.net.srv;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedByInterruptException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
-import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -21,7 +19,7 @@ public class NonBlockingConnectionHandler<T> implements ConnectionHandler<T> {
 	// TODO: change to bidi protocol
 	private final MessagingProtocol<T> protocol;
 	private final MessageEncoderDecoder<T> encdec;
-	private final Queue<ByteBuffer> writeQueue = new LinkedList<>();
+	private final Queue<ByteBuffer> writeQueue = new ConcurrentLinkedQueue<>();
 	private final SocketChannel chan;
 	private final Reactor<T> reactor;
 
@@ -62,8 +60,6 @@ public class NonBlockingConnectionHandler<T> implements ConnectionHandler<T> {
 		boolean success = false;
 		try {
 			success = this.chan.read(buf) != -1;
-		} catch (ClosedByInterruptException ex) {
-			Thread.currentThread().interrupt();
 		} catch (IOException ex) {
 			ex.printStackTrace();
 		}
@@ -112,7 +108,11 @@ public class NonBlockingConnectionHandler<T> implements ConnectionHandler<T> {
 		}
 
 		if (this.writeQueue.isEmpty()) {
-			this.reactor.updateInterestedOps(this.chan, SelectionKey.OP_READ);
+			if (this.protocol.shouldTerminate()) {
+				close();
+			} else {
+				this.reactor.updateInterestedOps(this.chan, SelectionKey.OP_READ);
+			}
 		}
 	}
 
