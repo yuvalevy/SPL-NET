@@ -8,7 +8,7 @@ import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
 import bgu.spl171.net.api.MessageEncoderDecoder;
-import bgu.spl171.net.api.MessagingProtocol;
+import bgu.spl171.net.api.bidi.BidiMessagingProtocol;
 import bgu.spl171.net.api.bidi.ConnectionHandler;
 
 public class NonBlockingConnectionHandler<T> implements ConnectionHandler<T> {
@@ -16,14 +16,13 @@ public class NonBlockingConnectionHandler<T> implements ConnectionHandler<T> {
 	private static final int BUFFER_ALLOCATION_SIZE = 1 << 13; // 8k
 	private static final ConcurrentLinkedQueue<ByteBuffer> BUFFER_POOL = new ConcurrentLinkedQueue<>();
 
-	// TODO: change to bidi protocol
-	private final MessagingProtocol<T> protocol;
+	private final BidiMessagingProtocol<T> protocol;
 	private final MessageEncoderDecoder<T> encdec;
 	private final Queue<ByteBuffer> writeQueue = new ConcurrentLinkedQueue<>();
 	private final SocketChannel chan;
 	private final Reactor<T> reactor;
 
-	public NonBlockingConnectionHandler(MessageEncoderDecoder<T> reader, MessagingProtocol<T> protocol,
+	public NonBlockingConnectionHandler(MessageEncoderDecoder<T> reader, BidiMessagingProtocol<T> protocol,
 			SocketChannel chan, Reactor<T> reactor) {
 		this.chan = chan;
 		this.encdec = reader;
@@ -71,12 +70,7 @@ public class NonBlockingConnectionHandler<T> implements ConnectionHandler<T> {
 					while (buf.hasRemaining()) {
 						T nextMessage = this.encdec.decodeNextByte(buf.get());
 						if (nextMessage != null) {
-							T response = this.protocol.process(nextMessage);
-							if (response != null) {
-								this.writeQueue.add(ByteBuffer.wrap(this.encdec.encode(response)));
-								this.reactor.updateInterestedOps(this.chan,
-										SelectionKey.OP_READ | SelectionKey.OP_WRITE);
-							}
+							this.protocol.process(nextMessage);
 						}
 					}
 				} finally {
@@ -122,7 +116,10 @@ public class NonBlockingConnectionHandler<T> implements ConnectionHandler<T> {
 
 	@Override
 	public void send(T msg) {
-
+		if (msg != null) {
+			this.writeQueue.add(ByteBuffer.wrap(this.encdec.encode(msg)));
+			this.reactor.updateInterestedOps(this.chan, SelectionKey.OP_READ | SelectionKey.OP_WRITE);
+		}
 	}
 
 }

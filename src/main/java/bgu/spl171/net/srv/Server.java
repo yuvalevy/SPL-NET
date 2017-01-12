@@ -4,7 +4,6 @@ import java.io.Closeable;
 import java.util.function.Supplier;
 
 import bgu.spl171.net.api.MessageEncoderDecoder;
-import bgu.spl171.net.api.MessagingProtocol;
 import bgu.spl171.net.api.bidi.BidiMessagingProtocol;
 
 public interface Server<T> extends Closeable {
@@ -24,7 +23,7 @@ public interface Server<T> extends Closeable {
 	 *            The Message Object for the protocol
 	 * @return A new reactor server
 	 */
-	public static <T> Server<T> reactor(int nthreads, int port, Supplier<MessagingProtocol<T>> protocolFactory,
+	public static <T> Server<T> reactor(int nthreads, int port, Supplier<BidiMessagingProtocol<T>> protocolFactory,
 			Supplier<MessageEncoderDecoder<T>> encoderDecoderFactory) {
 		return new Reactor<T>(nthreads, port, protocolFactory, encoderDecoderFactory);
 	}

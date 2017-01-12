@@ -43,8 +43,8 @@ public abstract class BaseServer<T> implements Server<T> {
 						protocol);
 
 				protocol.start(sock.hashCode(), connections);
-
 				connections.addConnection(handler, handler.hashCode());
+
 				execute(handler);
 			}
 		} catch (IOException ex) {

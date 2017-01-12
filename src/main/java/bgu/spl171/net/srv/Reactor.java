@@ -11,29 +11,31 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.Supplier;
 
 import bgu.spl171.net.api.MessageEncoderDecoder;
-import bgu.spl171.net.api.MessagingProtocol;
+import bgu.spl171.net.api.bidi.BidiMessagingProtocol;
 
 public class Reactor<T> implements Server<T> {
 
 	private final int port;
-	private final Supplier<MessagingProtocol<T>> protocolFactory;
+	private final Supplier<BidiMessagingProtocol<T>> protocolFactory;
 	private final Supplier<MessageEncoderDecoder<T>> readerFactory;
 	private final ActorThreadPool pool;
 	private Selector selector;
 
 	private Thread selectorThread;
 	private final ConcurrentLinkedQueue<Runnable> selectorTasks = new ConcurrentLinkedQueue<>();
+	private ServerConnections<T> connections;
 
-	public Reactor(int numThreads, int port, Supplier<MessagingProtocol<T>> protocolFactory,
+	public Reactor(int numThreads, int port, Supplier<BidiMessagingProtocol<T>> protocolFactory,
 			Supplier<MessageEncoderDecoder<T>> readerFactory) {
 
 		this.pool = new ActorThreadPool(numThreads);
 		this.port = port;
 		this.protocolFactory = protocolFactory;
 		this.readerFactory = readerFactory;
+		this.connections = new ServerConnections<T>();
 	}
 
-			/* package */ void updateInterestedOps(SocketChannel chan, int ops) {
+	void updateInterestedOps(SocketChannel chan, int ops) {
 		final SelectionKey key = chan.keyFor(this.selector);
 		if (Thread.currentThread() == this.selectorThread) {
 			key.interestOps(ops);
@@ -98,8 +100,12 @@ public class Reactor<T> implements Server<T> {
 	private void handleAccept(ServerSocketChannel serverChan, Selector selector) throws IOException {
 		SocketChannel clientChan = serverChan.accept();
 		clientChan.configureBlocking(false);
+		BidiMessagingProtocol<T> protocol = this.protocolFactory.get();
 		final NonBlockingConnectionHandler<T> handler = new NonBlockingConnectionHandler<T>(this.readerFactory.get(),
-				this.protocolFactory.get(), clientChan, this);
+				protocol, clientChan, this);
+
+		protocol.start(clientChan.hashCode(), connections);
+		connections.addConnection(handler, handler.hashCode());
 
 		clientChan.register(selector, SelectionKey.OP_READ, handler);
 	}
