@@ -1,21 +1,23 @@
 package bgu.spl171.net.impl.TFTP;
 
+import java.util.Collection;
+import java.util.concurrent.ConcurrentHashMap;
+
 import bgu.spl171.net.api.bidi.BidiMessagingProtocol;
 import bgu.spl171.net.api.bidi.Connections;
 import bgu.spl171.net.impl.TFTP.packets.*;
-import bgu.spl171.net.srv.LogedInConnection;
 
 enum State {
-
 	RUTINE, WRITE, SEND, DISCONNECTED
-
 }
 
 public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 
-	private LogedInConnection activeConnections;
 	private Connections<TFTPPacket> connections;
 	private int connectionId;
+
+	private static ConcurrentHashMap<String, FileStatus> files;
+	private static ConcurrentHashMap<String, Integer> userNames;
 
 	private boolean shouldTerminate;
 	private State state;
@@ -24,10 +26,15 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 	private String writePath;
 	private TFTPPacket savedPacket;
 
+	public enum FileStatus {
+		COMPLETE, INCOMPLETE
+	}
+
 	public TFTPProtocol() {
 		this.state = State.DISCONNECTED;
 		this.shouldTerminate = false;
-		this.activeConnections = LogedInConnection.getInstance();
+		files = new ConcurrentHashMap<>();
+		userNames = new ConcurrentHashMap<>();
 	}
 
 	@Override
@@ -65,7 +72,7 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 			if (opcode == 7) {
 				login((LoginPacket) packet);
 			} else {
-				send(new ErrorPacket(6));
+				send(new ErrorPacket((short) 6));
 			}
 			break;
 
@@ -106,6 +113,11 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 
 		if ((nextResult.getOpcode() == 5) || (packet.getSize() < 512)) {
 			this.state = State.RUTINE;
+			if (packet.getSize() < 512) {
+				files.put(this.writePath, FileStatus.COMPLETE);
+				sendBcast(this.writePath, '1');
+			}
+
 		}
 
 	}
@@ -119,38 +131,8 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 		TFTPPacket msg = packet.getNextResult();
 		send(msg);
 
-		sendBcast(filename, 0);
-	}
-
-	private void login(LoginPacket login) {
-
-		if (this.state == State.DISCONNECTED) {
-			send(new ErrorPacket(7));
-			return;
-		}
-
-		this.userName = login.getUsername();
-
-		boolean isAdded = this.activeConnections.login(this.connectionId, this.userName);
-		if (isAdded) {
-
-			send(new AckPacket(0));
-			this.state = State.RUTINE;
-
-		} else {
-			send(new ErrorPacket(7));
-		}
-	}
-
-	private void logout() {
-
-		this.activeConnections.logout(this.userName);
-		send(new AckPacket(0));
-
-		this.state = State.DISCONNECTED;
-		this.shouldTerminate = true;
-		this.connections.disconnect(this.connectionId);
-
+		files.remove(filename);
+		sendBcast(filename, '0');
 	}
 
 	private void rutine(TFTPPacket packet, short opcode) {
@@ -179,7 +161,7 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 
 		default:
 			if ((opcode > 10) | (opcode < 0)) {
-				send(new ErrorPacket(4));
+				send(new ErrorPacket((short) 4));
 			} else {
 				send(new ErrorPacket("Unexpected packet type " + opcode));
 			}
@@ -202,11 +184,11 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 	 * @param added
 	 *            deleted (0) or added (1)
 	 */
-	private void sendBcast(String filename, int added) {
+	private void sendBcast(String filename, char added) {
 
 		BCastPacket bcast = new BCastPacket(filename, added);
 
-		for (Integer id : this.activeConnections.getIds()) {
+		for (Integer id : getIds()) {
 			this.connections.send(id, bcast);
 		}
 	}
@@ -214,20 +196,76 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 	private void startSend(TFTPPacket packet) {
 
 		packet.execute();
-
-		this.state = State.SEND;
-		this.savedPacket = packet;
-
-		continueSending();
+		TFTPPacket result = packet.getNextResult();
+		if (result.getOpcode() != 5) {
+			this.state = State.SEND;
+			this.savedPacket = packet;
+		}
+		send(result);
 	}
 
 	private void write(WritePacket packet) {
 
 		packet.execute();
+		TFTPPacket writePacket = packet.getNextResult();
+		send(writePacket);
 
-		this.state = State.WRITE;
-		this.savedPacket = packet;
-		this.userName = packet.getFilename();
+		if (writePacket.getOpcode() != 5) {
+			this.state = State.WRITE;
+			this.savedPacket = packet;
+			this.writePath = packet.getFilename();
+			files.put(this.writePath, FileStatus.INCOMPLETE);
+		}
 
+	}
+
+	private void login(LoginPacket login) {
+
+		if (this.state == State.DISCONNECTED) {
+			send(new ErrorPacket((short) 7));
+			return;
+		}
+
+		this.userName = login.getUsername();
+
+		boolean isAdded = login(this.connectionId, this.userName);
+		if (isAdded) {
+
+			send(new AckPacket((short) 0));
+			this.state = State.RUTINE;
+
+		} else {
+			send(new ErrorPacket((short) 7));
+		}
+	}
+
+	private void logout() {
+
+		logout(this.userName);
+		send(new AckPacket((short) 0));
+
+		this.state = State.DISCONNECTED;
+		this.shouldTerminate = true;
+		this.connections.disconnect(this.connectionId);
+
+	}
+
+	public boolean login(int connectionId, String userName) {
+
+		int value = userNames.putIfAbsent(userName, connectionId);
+
+		if (value != connectionId) { // user with this username already exists
+			return false;
+		}
+
+		return true;
+	}
+
+	public void logout(String userName) {
+		userNames.remove(userName);
+	}
+
+	public Collection<Integer> getIds() {
+		return userNames.values();
 	}
 }

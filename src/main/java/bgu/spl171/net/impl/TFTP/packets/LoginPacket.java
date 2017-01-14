@@ -10,11 +10,11 @@ public class LoginPacket implements TFTPPacket {
 
 	@Override
 	public void execute() {
+		// does nothing
 	}
 
 	@Override
 	public TFTPPacket getNextResult() {
-		// TODO Auto-generated method stub
 		return null;
 	}
 

@@ -1,8 +1,11 @@
 package bgu.spl171.net.impl.TFTP.packets;
 
+import java.io.File;
+
 public class DeletePacket implements TFTPPacket {
 
 	private String filename;
+	private TFTPPacket response;
 
 	public DeletePacket(String filename) {
 		this.filename = filename;
@@ -10,14 +13,18 @@ public class DeletePacket implements TFTPPacket {
 
 	@Override
 	public void execute() {
-		// TODO Auto-generated method stub
-
+		File file = new File(filename);
+		if (!file.exists()) {
+			this.response = new ErrorPacket((short) 1);
+		} else {
+			file.delete();
+			this.response = new AckPacket((short) 0);
+		}
 	}
 
 	@Override
 	public TFTPPacket getNextResult() {
-		// TODO Auto-generated method stub
-		return null;
+		return response;
 	}
 
 	@Override

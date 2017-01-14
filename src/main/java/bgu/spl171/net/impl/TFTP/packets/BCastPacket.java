@@ -3,7 +3,7 @@ package bgu.spl171.net.impl.TFTP.packets;
 public class BCastPacket implements TFTPPacket {
 
 	private String filename;
-	private int added;
+	private char added;
 
 	/**
 	 * 
@@ -11,13 +11,14 @@ public class BCastPacket implements TFTPPacket {
 	 * @param added
 	 *            deleted (0) or added (1)
 	 */
-	public BCastPacket(String filename, int added) {
+	public BCastPacket(String filename, char added) {
 		this.filename = filename;
 		this.added = added;
 	}
 
 	@Override
 	public void execute() {
+		// does nothing
 	}
 
 	@Override
@@ -34,7 +35,7 @@ public class BCastPacket implements TFTPPacket {
 		return filename;
 	}
 
-	public int getCreateDelete() {
+	public char getCreateDelete() {
 		return added;
 	}
 }

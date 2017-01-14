@@ -4,13 +4,13 @@ public class AckPacket implements TFTPPacket {
 
 	private short blockNum;
 
-	public AckPacket(int blockNum) {
+	public AckPacket(short blockNum) {
 		this.blockNum = (short) blockNum;
 	}
 
 	@Override
 	public void execute() {
-
+		// does nothing
 	}
 
 	@Override
