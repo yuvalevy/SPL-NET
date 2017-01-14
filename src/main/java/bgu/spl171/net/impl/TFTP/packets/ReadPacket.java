@@ -43,12 +43,16 @@ public class ReadPacket implements TFTPPacket {
 			return error;
 		}
 
+		DataPacket nextPacket = null;
+
 		if (start > this.datas.length) {
 			return null;
+		} else if (start > this.datas.length) {
+			nextPacket = new DataPacket(blockNum);
+		} else {
+			nextPacket = createDataPacket(blockNum, start);
 		}
 
-		DataPacket nextPacket = null;
-		nextPacket = createDataPacket(blockNum, start);
 		start = start + MAXPACKETSIZE;
 		blockNum++;
 

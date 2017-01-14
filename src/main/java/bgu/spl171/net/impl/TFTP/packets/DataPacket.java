@@ -19,6 +19,10 @@ public class DataPacket implements TFTPPacket {
 		filename = null;
 	}
 
+	public DataPacket(short blockNum) {
+		this(blockNum, new byte[0]);
+	}
+
 	@Override
 	public void execute() {
 

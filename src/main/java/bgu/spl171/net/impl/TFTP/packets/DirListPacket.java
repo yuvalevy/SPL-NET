@@ -1,5 +1,6 @@
 package bgu.spl171.net.impl.TFTP.packets;
 
+import java.util.Arrays;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -11,11 +12,10 @@ public class DirListPacket implements TFTPPacket {
 	private ConcurrentHashMap<String, FileStatus> files;
 	private String seperator;
 	private int start;
-	private String completedFiles;
+	private byte[] completedFiles;
 	private Short blockNum;
 
 	public DirListPacket() {
-		this.completedFiles = "";
 		this.blockNum = 1;
 		this.start = 0;
 		this.seperator = "/0";
@@ -23,17 +23,23 @@ public class DirListPacket implements TFTPPacket {
 
 	@Override
 	public void execute() {
-		fileStringByStatus(FileStatus.COMPLETE);
+		fileStringByteByStatus(FileStatus.COMPLETE);
 
 	}
 
 	@Override
 	public TFTPPacket getNextResult() {
-		if (start > this.completedFiles.length()) {
-			return null;
-		}
+
 		DataPacket nextPacket = null;
-		nextPacket = createDataPacket(blockNum, start);
+		int length = this.completedFiles.length;
+
+		if (start > length) {
+			return null;
+		} else if (start == length) {
+			nextPacket = new DataPacket(blockNum);
+		} else {
+			nextPacket = createDataPacket(blockNum, start);
+		}
 		start = start + MAXPACKETSIZE;
 		blockNum++;
 
@@ -46,24 +52,24 @@ public class DirListPacket implements TFTPPacket {
 		return 6;
 	}
 
-	private void fileStringByStatus(FileStatus status) {
+	private void fileStringByteByStatus(FileStatus status) {
+		String filesString = "";
 		for (Map.Entry<String, FileStatus> entry : files.entrySet()) {
 			if (entry.getValue() == status) {
-				completedFiles += entry.getKey() + seperator;
+				filesString += entry.getKey() + seperator;
 			}
 		}
+		completedFiles = filesString.getBytes();
 	}
 
 	private DataPacket createDataPacket(short blockNum, int start) {
-
 		int dataSize = MAXPACKETSIZE;
-		int length = this.completedFiles.length();
 
-		if (start + MAXPACKETSIZE > length) {
-			dataSize = length - start;
+		if (start + MAXPACKETSIZE > this.completedFiles.length) {
+			dataSize = this.completedFiles.length - start;
 		}
 
-		byte[] data = completedFiles.substring(start, dataSize).getBytes();
+		byte[] data = Arrays.copyOfRange(this.completedFiles, start, start + dataSize);
 
 		DataPacket dataPacket = new DataPacket(blockNum, data);
 
