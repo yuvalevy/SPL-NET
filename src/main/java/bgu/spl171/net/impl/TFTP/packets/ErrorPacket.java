@@ -5,18 +5,22 @@ public class ErrorPacket implements TFTPPacket {
 	private short code;
 	private String msg;
 
-	public ErrorPacket(int i) {
-		this.code = (short) i;
-		// TODO should copy error msg?
+	public ErrorPacket(short code) {
+		this(code, "");
+	}
+
+	public ErrorPacket(short code, String msg) {
+		this.code = code;
+		this.msg = msg;
 	}
 
 	public ErrorPacket(String msg) {
-		this.msg = msg;
-		this.code = 0;
+		this((short) 0, msg);
 	}
 
 	@Override
 	public void execute() {
+		// does nothing
 	}
 
 	@Override
@@ -29,12 +33,13 @@ public class ErrorPacket implements TFTPPacket {
 		return 5;
 	}
 
+	// TODO:check if yuval used get code or this name
 	public short getErrorCode() {
-		return code;
+		return this.code;
 	}
 
 	public String getMsg() {
-		return msg;
+		return this.msg;
 	}
 
 }

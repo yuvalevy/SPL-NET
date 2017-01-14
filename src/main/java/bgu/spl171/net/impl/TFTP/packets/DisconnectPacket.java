@@ -4,13 +4,11 @@ public class DisconnectPacket implements TFTPPacket {
 
 	@Override
 	public void execute() {
-		// TODO Auto-generated method stub
-
+		// does nothing
 	}
 
 	@Override
 	public TFTPPacket getNextResult() {
-		// TODO Auto-generated method stub
 		return null;
 	}
 

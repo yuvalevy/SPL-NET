@@ -1,5 +1,6 @@
 package bgu.spl171.net.impl.TFTP.packets;
 
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -9,37 +10,56 @@ import java.util.Arrays;
 public class ReadPacket implements TFTPPacket {
 
 	private byte[] datas;
+	private String fileName;
+	private TFTPPacket error;
+	private short blockNum;
+	private int start;
+	private final int MAXPACKETSIZE = 512;
+
+	public ReadPacket(String fileName) {
+		this.fileName = fileName;
+		this.blockNum = 1;
+		this.start = 0;
+		this.error = null;
+	}
 
 	@Override
 	public void execute() {
 
-		Path path = Paths.get("path/to/file");
+		Path path = Paths.get("Files/" + fileName);
 		try {
 			datas = Files.readAllBytes(path);
+		} catch (FileNotFoundException e) {
+			this.error = new ErrorPacket((short) 1);
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+			this.error = new ErrorPacket((short) 2);
 		}
-
 	}
 
 	@Override
 	public TFTPPacket getNextResult() {
 
-		short blockNum = 1;
-		for (int i = 0; i < datas.length; i += 512) {
-			DataPacket nextPacket = createDataPacket(blockNum, i);
-			blockNum++;
+		if (error != null) {
+			return error;
 		}
 
-		return null;
+		if (start > this.datas.length) {
+			return null;
+		}
+
+		DataPacket nextPacket = null;
+		nextPacket = createDataPacket(blockNum, start);
+		start = start + MAXPACKETSIZE;
+		blockNum++;
+
+		return nextPacket;
 	}
 
 	private DataPacket createDataPacket(short blockNum, int start) {
 
-		int dataSize = 512;
+		int dataSize = MAXPACKETSIZE;
 
-		if (start + 512 >= this.datas.length) {
+		if (start + MAXPACKETSIZE > this.datas.length) {
 			dataSize = this.datas.length - start;
 		}
 
@@ -48,7 +68,6 @@ public class ReadPacket implements TFTPPacket {
 		DataPacket dataPacket = new DataPacket(blockNum, data);
 
 		// Complete
-
 		return dataPacket;
 	}
 
