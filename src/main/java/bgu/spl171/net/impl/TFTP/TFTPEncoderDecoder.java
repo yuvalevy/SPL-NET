@@ -8,60 +8,145 @@ import bgu.spl171.net.impl.TFTP.packets.*;
 
 public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 
-	private final byte ENDER = '\0';
-	private byte[] opcArray;
-	private byte[] bytes;
-	private short opcode;
-	private int size;
-	private int opsize;
-	private short datasize;
+	private class ReadingState {
 
-	// private PacketED
+		private byte[] opcArray;
+		private int opsize = 0;
+
+		private byte[] bytes;
+		private short opcode;
+		private int size;
+
+		private short datasize;
+
+		byte[] get() {
+			return this.bytes;
+		}
+
+		int getOpcode() {
+			return this.opcode;
+		}
+
+		boolean isWaitingForEnder() {
+			return (this.opcode == 1) || (this.opcode == 2) || (this.opcode == 5) || (this.opcode == 7)
+					|| (this.opcode == 8);
+		}
+
+		boolean next(byte nextByte) {
+
+			boolean res = false;
+
+			if (this.opsize < 2) { // opcode not yet found
+
+				this.opcArray[this.opsize] = nextByte;
+				this.opsize++;
+
+				if (this.opsize == 2) { // opcode now found
+					this.opcode = bytesToShort(this.opcArray, 0);
+
+					if ((res = isParamlessPackets())) {
+						initCounters();
+					}
+				}
+
+			} else {
+
+				if ((res = addByteByOpcode(nextByte))) {
+					initCounters();
+				}
+
+			}
+
+			return res;
+
+		}
+
+		private boolean addByteByOpcode(byte nextByte) {
+
+			if (isWaitingForEnder()) { // READ, WRITE, LOGIN, DELETE
+
+				if (isEnder(nextByte)) {
+					return true;
+				}
+
+				pushByte(nextByte);
+			}
+
+			pushByte(nextByte);
+
+			if (this.opcode == 3) { // DATA
+				return isFinishedReadingData(nextByte);
+			}
+
+			if (this.opcode == 4) { // ACK
+				return this.size == 2;
+			}
+
+			// problem...
+			return false;
+		}
+
+		private void initCounters() {
+			this.opcode = -1;
+			this.size = 0;
+			this.opsize = 0;
+		}
+
+		private boolean isFinishedReadingData(byte nextByte) {
+
+			if (this.size == 2) { // getting 'DATA size'
+				this.datasize = bytesToShort(this.bytes, 0);
+			} else {
+				// finished reading all data
+				return ((this.size - 4) == this.datasize);
+			}
+
+			return false;
+
+		}
+
+		/**
+		 * Checks id the current opcode (this.opcode) is one of {6, 10}, and if
+		 * so, returns true.
+		 *
+		 * @return true if packet is {6, 10} false otherwise
+		 */
+		private boolean isParamlessPackets() {
+
+			if ((this.opcode == 6) || (this.opcode == 10)) {
+				return true;
+			}
+
+			return false;
+		}
+
+		private void pushByte(byte nextByte) {
+			if (this.size >= this.bytes.length) {
+				this.bytes = Arrays.copyOf(this.bytes, this.size * 2);
+			}
+
+			this.bytes[this.size++] = nextByte;
+		}
+
+	}
+
+	private ReadingState readingState;
+	private byte[] bytes;
+	private final byte ENDER = '\0';
+
 	public TFTPEncoderDecoder() {
-		this.opcArray = new byte[2];
-		this.bytes = new byte[1 << 10]; // start with 1k
-		initCounters();
+		this.readingState = new ReadingState();
 	}
 
 	@Override
 	public TFTPPacket decodeNextByte(byte nextByte) {
 
-		// if (packetED == null){
-		// PacketED = getPacket(firstByte);
-		// }
-		// else {
-		// return PacketED.nextByte();
-		// }
-
-		// isDone = readingState.next(nextByte);
-		// if (isDone) {
-		// return decodePacket();
-		// }
-		// return null;
-
-		TFTPPacket $ = null;
-		if (this.opsize < 2) { // opcode not yet found
-
-			this.opcArray[this.opsize] = nextByte;
-			this.opsize++;
-
-			if (this.opsize == 2) { // opcode now found
-
-				this.opcode = bytesToShort(this.opcArray, 0);
-				$ = decodeParamlessPackets();
-
-			}
-
-		} else if (this.opsize == 2) { // already found opcode
-
-			$ = decodeParamsPackets(nextByte);
+		boolean isDone = false;
+		isDone = this.readingState.next(nextByte);
+		if (isDone) {
+			return decodePacket(this.readingState.get());
 		}
-
-		if ($ != null) { // if we return a packet - resets the memory
-			initCounters();
-		}
-
-		return $;
+		return null;
 	}
 
 	/**
@@ -76,20 +161,13 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 		switch (opcode) {
 
 		case 3: // DATA
-			$ = encodeData((DataPacket) message);
-			break;
-
+			return encodeData((DataPacket) message);
 		case 4: // ACK
-			$ = encodeAck((AckPacket) message);
-			break;
-
+			return encodeAck((AckPacket) message);
 		case 5: // ERROR
-			$ = encodeError((ErrorPacket) message);
-			break;
-
+			return encodeError((ErrorPacket) message);
 		case 9: // BCAST
-			$ = encodeBcast((BCastPacket) message);
-			break;
+			return encodeBcast((BCastPacket) message);
 		}
 
 		return $;
@@ -102,131 +180,44 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 	}
 
 	private TFTPPacket decodeAck() {
-		TFTPPacket $ = null;
-		if (this.size == 2) {
-			short blocknum = bytesToShort(this.bytes, 0);
-			$ = new AckPacket(blocknum);
-		}
-		return $;
+		short blocknum = bytesToShort(this.bytes, 0);
+		return new AckPacket(blocknum);
 	}
 
-	private TFTPPacket decodeData(byte nextByte) {
-
-		TFTPPacket $ = null;
-		if (this.size == 2) { // getting 'DATA size'
-			this.datasize = bytesToShort(this.bytes, 0);
-
-		} else if (this.size > 2) { // after getting the size
-
-			// one byte is not yet inserted - checking the input without it
-			// (4 bytes for data size and block#)
-			if ((this.size - 3) == this.datasize) { // finished reading all
-													// data
-				pushByte(nextByte);
-				short blocknum = bytesToShort(this.bytes, 2);
-				byte[] data = null;
-				System.arraycopy(this.bytes, 4, data, 0, this.bytes.length);
-				$ = new DataPacket(blocknum, data);
-			}
-		}
-		return $;
+	private TFTPPacket decodeData() {
+		short blocknum = bytesToShort(this.bytes, 2);
+		byte[] data = null;
+		System.arraycopy(this.bytes, 4, data, 0, this.bytes.length);
+		return new DataPacket(blocknum, data);
 	}
 
-	private ErrorPacket decodeError(byte nextByte) {
-
-		ErrorPacket $ = null;
-
-		if (nextByte == this.ENDER) {
-
-			short code = bytesToShort(this.bytes, 0);
-
-			byte[] stringasbytes = Arrays.copyOfRange(this.bytes, 2, this.bytes.length - 2);
-			$ = new ErrorPacket(code, new String(stringasbytes));
-		}
-		return $;
+	private ErrorPacket decodeError() {
+		short code = bytesToShort(this.bytes, 0);
+		byte[] stringasbytes = Arrays.copyOfRange(this.bytes, 2, this.bytes.length - 2);
+		return new ErrorPacket(code, new String(stringasbytes));
 	}
 
-	// private TFTPPacket decodePacket() {
-	// switch (this.opcode) {
-	//
-	// }
-	// }
+	private TFTPPacket decodePacket(byte[] bytes) {
 
-	/**
-	 * Checks id the current opcode (this.opcode) is one of {6, 10}, and if so,
-	 * returns new instance of them.
-	 *
-	 * @return {6, 10} packet if the current opcode is fitting, null otherwise
-	 */
-	private TFTPPacket decodeParamlessPackets() {
-
-		TFTPPacket $ = null;
-		switch (this.opcode) {
-		case 6:
-			$ = new DirListPacket();
-			break;
-		case 10:
-			$ = new DisconnectPacket();
-			break;
-		}
-		return $;
-	}
-
-	/**
-	 * Decodes TFTPPacket packets. Only packets {1, 2, 3, 4 ,5 ,8} is encoded
-	 * here
-	 *
-	 * @param nextByte
-	 * @return TFTPPacket if the decoding process is finished. null otherwise
-	 */
-	private TFTPPacket decodeParamsPackets(byte nextByte) {
-
-		TFTPPacket $ = null;
-
-		switch (this.opcode) {
+		switch (this.readingState.getOpcode()) {
 
 		case 1: // READ
-			$ = getInstanceForStringParam(ReadPacket.class, nextByte);
-			break;
-
+			return getInstanceForStringParam(ReadPacket.class);
 		case 2: // WRITE
-			$ = getInstanceForStringParam(WritePacket.class, nextByte);
-			break;
-
+			return getInstanceForStringParam(WritePacket.class);
 		case 3: // DATA
-
-			$ = decodeData(nextByte);
-
-			break;
-
+			return decodeData();
 		case 4: // ACK
-			$ = decodeAck();
-			break;
-
+			return decodeAck();
 		case 5: // ERROR
-			$ = decodeError(nextByte);
-			break;
-
+			return decodeError();
 		case 7:// LOGIN
-			$ = getInstanceForStringParam(LoginPacket.class, nextByte);
-			break;
-
+			return getInstanceForStringParam(LoginPacket.class);
 		case 8: // DETELE
-			$ = getInstanceForStringParam(DeletePacket.class, nextByte);
-			break;
-
-		default:
-			break;
+			return getInstanceForStringParam(DeletePacket.class);
 		}
 
-		if ($ == null) {
-			pushByte(nextByte);
-		} else {
-			this.size = 0;
-			this.opsize = 0;
-		}
-
-		return $;
+		return null;
 	}
 
 	private byte[] encodeAck(AckPacket message) {
@@ -326,46 +317,32 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 	}
 
 	/**
-	 * Getting a class whom first constructor is getting only String. If
-	 * nextByte is ENDER, decodes the bytes to String and returns new object
+	 * Getting a class whom first constructor is getting only String. Then
+	 * decodes the bytes to String and returns new object
 	 *
 	 * @param classObj
 	 *            class which extends TFTPPacket to instance
-	 * @param nextByte
 	 * @return
 	 */
 	@SuppressWarnings("unchecked")
-	private <T extends TFTPPacket> T getInstanceForStringParam(Class<T> classObj, byte nextByte) {
+	private <T extends TFTPPacket> T getInstanceForStringParam(Class<T> classObj) {
 
-		String param = "";
+		String param = new String(this.bytes);
 
-		if (nextByte == this.ENDER) {
-			param = new String(this.bytes);
-
-			try {
-				return (T) classObj.getConstructors()[0].newInstance(param);
-			} catch (InstantiationException | IllegalAccessException | IllegalArgumentException
-					| InvocationTargetException | SecurityException e) {
-			}
+		try {
+			return (T) classObj.getConstructors()[0].newInstance(param);
+		} catch (InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException
+				| SecurityException e) {
 		}
 		return null;
 	}
 
 	/**
-	 * resent all relevant counters
+	 * @param nextByte
+	 * @return whether this byte is the ENDER byte
 	 */
-	private void initCounters() {
-		this.opcode = -1;
-		this.size = 0;
-		this.opsize = 0;
-	}
-
-	private void pushByte(byte nextByte) {
-		if (this.size >= this.bytes.length) {
-			this.bytes = Arrays.copyOf(this.bytes, this.size * 2);
-		}
-
-		this.bytes[this.size++] = nextByte;
+	private boolean isEnder(byte nextByte) {
+		return (nextByte == this.ENDER);
 	}
 
 	private byte[] shortToBytes(short num) {
@@ -374,4 +351,5 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 		bytesArr[1] = (byte) (num & 0xFF);
 		return bytesArr;
 	}
+
 }
