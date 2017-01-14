@@ -141,10 +141,7 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 			short code = bytesToShort(this.bytes, 0);
 
 			byte[] stringasbytes = Arrays.copyOfRange(this.bytes, 2, this.bytes.length - 2);
-			String errmag = new String(stringasbytes);
-
-			// TODO: when pulling......
-			// $ = new ErrorPacket(code,errmsg);
+			$ = new ErrorPacket(code, new String(stringasbytes));
 		}
 		return $;
 	}
@@ -261,14 +258,8 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 		$[0] = temp[0];
 		$[1] = temp[1];
 
-		// TODO change after pull - get char and not int
 		// Deleted/Added
-		int da = message.getCreateDelete();
-		if (da == 0) {
-			$[2] = '0';
-		} else {
-			$[2] = '1';
-		}
+		$[2] = (byte) message.getCreateDelete();
 
 		// filename
 		System.arraycopy(filename, 0, $, 3, filename.length);
@@ -289,9 +280,8 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 		$[0] = temp[0];
 		$[1] = temp[1];
 
-		// TODO: delete casting after pull
 		// packet size
-		temp = shortToBytes((short) message.getSize());
+		temp = shortToBytes(message.getSize());
 
 		$[2] = temp[0];
 		$[3] = temp[1];
@@ -302,9 +292,8 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 		$[4] = temp[0];
 		$[5] = temp[1];
 
-		byte[] data = null;// TODO message.getData();
 		// n bytes
-		System.arraycopy(data, 0, $, 6, data.length);
+		System.arraycopy(message.getData(), 0, $, 6, message.getData().length);
 
 		return $;
 

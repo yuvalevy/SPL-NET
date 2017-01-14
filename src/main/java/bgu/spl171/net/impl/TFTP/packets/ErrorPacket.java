@@ -23,6 +23,14 @@ public class ErrorPacket implements TFTPPacket {
 		// does nothing
 	}
 
+	public short getErrorCode() {
+		return this.code;
+	}
+
+	public String getMsg() {
+		return this.msg;
+	}
+
 	@Override
 	public TFTPPacket getNextResult() {
 		return null;
@@ -31,15 +39,6 @@ public class ErrorPacket implements TFTPPacket {
 	@Override
 	public short getOpcode() {
 		return 5;
-	}
-
-	// TODO:check if yuval used get code or this name
-	public short getErrorCode() {
-		return this.code;
-	}
-
-	public String getMsg() {
-		return this.msg;
 	}
 
 }

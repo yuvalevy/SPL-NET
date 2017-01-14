@@ -8,19 +8,17 @@ public class DataPacket implements TFTPPacket {
 	private String filename;
 	private short blockNum;
 	private byte[] data;
-	private short size;
 
 	private TFTPPacket reponse;
+
+	public DataPacket(short blockNum) {
+		this(blockNum, new byte[0]);
+	}
 
 	public DataPacket(short blockNum, byte[] data) {
 		this.blockNum = blockNum;
 		this.data = data;
-		this.size = (short) data.length;// range between 0-512
-		filename = null;
-	}
-
-	public DataPacket(short blockNum) {
-		this(blockNum, new byte[0]);
+		this.filename = null;
 	}
 
 	@Override
@@ -28,8 +26,8 @@ public class DataPacket implements TFTPPacket {
 
 		FileOutputStream output = null;
 		try {
-			output = new FileOutputStream(filename, true);
-			output.write(data);
+			output = new FileOutputStream(this.filename, true);
+			output.write(this.data);
 		} catch (IOException e) {
 			this.reponse = new ErrorPacket((short) 2);
 		} finally {
@@ -41,9 +39,17 @@ public class DataPacket implements TFTPPacket {
 		}
 
 		if (this.reponse == null) {
-			this.reponse = new AckPacket(blockNum);
+			this.reponse = new AckPacket(this.blockNum);
 		}
 
+	}
+
+	public short getBlockNum() {
+		return this.blockNum;
+	}
+
+	public byte[] getData() {
+		return this.data;
 	}
 
 	@Override
@@ -51,25 +57,17 @@ public class DataPacket implements TFTPPacket {
 		return this.reponse;
 	}
 
-	public void setFilename(String filename) {
-		this.filename = filename;
-	}
-
 	@Override
 	public short getOpcode() {
 		return 3;
 	}
 
-	public short getBlockNum() {
-		return blockNum;
+	public short getSize() {
+		return (short) this.data.length;
 	}
 
-	public int getSize() {
-		return this.size;
-	}
-
-	public byte[] getData() {
-		return data;
+	public void setFilename(String filename) {
+		this.filename = filename;
 	}
 
 }
