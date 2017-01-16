@@ -1,11 +1,13 @@
 package bgu.spl171.net.impl.TFTP.packets;
 
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
+import java.util.concurrent.ConcurrentHashMap;
+
+import bgu.spl171.net.impl.TFTP.TFTPProtocol.FileStatus;
 
 public class ReadPacket implements TFTPPacket {
 
@@ -15,6 +17,7 @@ public class ReadPacket implements TFTPPacket {
 	private short blockNum;
 	private int start;
 	private final int MAXPACKETSIZE = 512;
+	private ConcurrentHashMap<String, FileStatus> files;
 
 	public ReadPacket(String fileName) {
 		this.fileName = fileName;
@@ -26,11 +29,16 @@ public class ReadPacket implements TFTPPacket {
 	@Override
 	public void execute() {
 
-		Path path = Paths.get("Files/" + fileName);
-		try {
-			datas = Files.readAllBytes(path);
-		} catch (FileNotFoundException e) {
+		FileStatus fileStatus = this.files.get(this.fileName);
+		if ((fileStatus == null) | (fileStatus == FileStatus.INCOMPLETE)) {
 			this.error = new ErrorPacket((short) 1);
+			return;
+		}
+
+		Path path = Paths.get("Files/" + this.fileName);
+
+		try {
+			this.datas = Files.readAllBytes(path);
 		} catch (IOException e) {
 			this.error = new ErrorPacket((short) 2);
 		}
@@ -39,31 +47,40 @@ public class ReadPacket implements TFTPPacket {
 	@Override
 	public TFTPPacket getNextResult() {
 
-		if (error != null) {
-			return error;
+		if (this.error != null) {
+			return this.error;
 		}
 
 		DataPacket nextPacket = null;
 
-		if (start > this.datas.length) {
+		if (this.start > this.datas.length) {
 			return null;
-		} else if (start > this.datas.length) {
-			nextPacket = new DataPacket(blockNum);
+		} else if (this.start == this.datas.length) {
+			nextPacket = new DataPacket(this.blockNum);
 		} else {
-			nextPacket = createDataPacket(blockNum, start);
+			nextPacket = createDataPacket(this.blockNum, this.start);
 		}
 
-		start = start + MAXPACKETSIZE;
-		blockNum++;
+		this.start = this.start + this.MAXPACKETSIZE;
+		this.blockNum++;
 
 		return nextPacket;
 	}
 
+	@Override
+	public short getOpcode() {
+		return 1;
+	}
+
+	public void setFiles(ConcurrentHashMap<String, FileStatus> files) {
+		this.files = files;
+	}
+
 	private DataPacket createDataPacket(short blockNum, int start) {
 
-		int dataSize = MAXPACKETSIZE;
+		int dataSize = this.MAXPACKETSIZE;
 
-		if (start + MAXPACKETSIZE > this.datas.length) {
+		if ((start + this.MAXPACKETSIZE) > this.datas.length) {
 			dataSize = this.datas.length - start;
 		}
 
@@ -75,8 +92,4 @@ public class ReadPacket implements TFTPPacket {
 		return dataPacket;
 	}
 
-	@Override
-	public short getOpcode() {
-		return 1;
-	}
 }

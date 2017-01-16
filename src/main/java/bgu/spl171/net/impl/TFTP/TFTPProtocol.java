@@ -29,13 +29,14 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 	private String userName;
 	private String writePath;
 
+	private short currentBlockNumber;
 	private TFTPPacket savedPacket;
 
 	public TFTPProtocol() {
 		this.state = State.DISCONNECTED;
 		this.shouldTerminate = false;
-		files = new ConcurrentHashMap<>();
-		userNames = new ConcurrentHashMap<>();
+		files = new ConcurrentHashMap<String, FileStatus>();
+		userNames = new ConcurrentHashMap<String, Integer>();
 	}
 
 	public Collection<Integer> getIds() {
@@ -74,7 +75,7 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 			if (opcode != 4) {
 				send(new ErrorPacket("Currently on READ state. Expected acknowledgment packet."));
 			} else {
-				continueSending();
+				continueSending((AckPacket) packet);
 			}
 			break;
 
@@ -110,7 +111,15 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 		this.connectionId = connectionId;
 	}
 
-	private void continueSending() {
+	private void continueSending(AckPacket packet) {
+
+		if (packet.getBlockNum() != this.currentBlockNumber) {
+			send(new ErrorPacket((short) 0, "Expected " + this.currentBlockNumber + " block number and got "
+					+ packet.getBlockNum() + " block number."));
+			this.state = State.RUTINE;
+			this.savedPacket = null;
+			this.currentBlockNumber = 0;
+		}
 
 		TFTPPacket nextResult = this.savedPacket.getNextResult();
 
@@ -119,6 +128,7 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 		} else { // exiting from SEND state
 			this.state = State.RUTINE;
 			this.savedPacket = null;
+			this.currentBlockNumber = 0;
 		}
 
 	}
@@ -199,6 +209,8 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 			break;
 
 		case 6:
+			DirListPacket dir = (DirListPacket) packet;
+			dir.setFiles(files);
 			startSend(packet);
 			break;
 
@@ -227,6 +239,7 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 	 */
 	private void send(TFTPPacket packet) {
 		this.connections.send(this.connectionId, packet);
+		this.currentBlockNumber = 1;
 	}
 
 	/**

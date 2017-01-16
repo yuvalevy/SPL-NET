@@ -9,8 +9,9 @@ import bgu.spl171.net.impl.TFTP.TFTPProtocol.FileStatus;
 public class DirListPacket implements TFTPPacket {
 
 	private final int MAXPACKETSIZE = 512;
+	private final char SEPARATOR = '\0';
 	private ConcurrentHashMap<String, FileStatus> files;
-	private String seperator;
+
 	private int start;
 	private byte[] completedFiles;
 	private Short blockNum;
@@ -18,7 +19,6 @@ public class DirListPacket implements TFTPPacket {
 	public DirListPacket() {
 		this.blockNum = 1;
 		this.start = 0;
-		this.seperator = "/0";
 	}
 
 	@Override
@@ -33,15 +33,15 @@ public class DirListPacket implements TFTPPacket {
 		DataPacket nextPacket = null;
 		int length = this.completedFiles.length;
 
-		if (start > length) {
+		if (this.start > length) {
 			return null;
-		} else if (start == length) {
-			nextPacket = new DataPacket(blockNum);
+		} else if (this.start == length) {
+			nextPacket = new DataPacket(this.blockNum);
 		} else {
-			nextPacket = createDataPacket(blockNum, start);
+			nextPacket = createDataPacket(this.blockNum, this.start);
 		}
-		start = start + MAXPACKETSIZE;
-		blockNum++;
+		this.start = this.start + this.MAXPACKETSIZE;
+		this.blockNum++;
 
 		return nextPacket;
 
@@ -52,20 +52,14 @@ public class DirListPacket implements TFTPPacket {
 		return 6;
 	}
 
-	private void fileStringByteByStatus(FileStatus status) {
-		String filesString = "";
-		for (Map.Entry<String, FileStatus> entry : files.entrySet()) {
-			if (entry.getValue() == status) {
-				filesString += entry.getKey() + seperator;
-			}
-		}
-		completedFiles = filesString.getBytes();
+	public void setFiles(ConcurrentHashMap<String, FileStatus> files) {
+		this.files = files;
 	}
 
 	private DataPacket createDataPacket(short blockNum, int start) {
-		int dataSize = MAXPACKETSIZE;
+		int dataSize = this.MAXPACKETSIZE;
 
-		if (start + MAXPACKETSIZE > this.completedFiles.length) {
+		if ((start + this.MAXPACKETSIZE) > this.completedFiles.length) {
 			dataSize = this.completedFiles.length - start;
 		}
 
@@ -73,8 +67,19 @@ public class DirListPacket implements TFTPPacket {
 
 		DataPacket dataPacket = new DataPacket(blockNum, data);
 
-		// Complete
 		return dataPacket;
+	}
+
+	private void fileStringByteByStatus(FileStatus status) {
+
+		String filesString = "";
+
+		for (Map.Entry<String, FileStatus> entry : this.files.entrySet()) {
+			if (entry.getValue() == status) {
+				filesString += entry.getKey() + this.SEPARATOR;
+			}
+		}
+		this.completedFiles = filesString.getBytes();
 	}
 
 }

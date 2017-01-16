@@ -14,13 +14,25 @@ public class WritePacket implements TFTPPacket {
 
 	@Override
 	public void execute() {
-		File file = new File("Files/" + fileName);
+
+		File file = new File("Files/" + this.fileName);
+
 		try {
-			file.createNewFile();
-			this.response = new AckPacket((short) 0);
+
+			if (file.createNewFile()) {
+				this.response = new AckPacket((short) 0);
+			} else {
+				this.response = new ErrorPacket((short) 5); // file already
+															// exists
+			}
+
 		} catch (IOException e) {
-			this.response = new ErrorPacket((short) 5);
+			this.response = new ErrorPacket((short) 2);
 		}
+	}
+
+	public String getFilename() {
+		return this.fileName;
 	}
 
 	@Override
@@ -31,10 +43,6 @@ public class WritePacket implements TFTPPacket {
 	@Override
 	public short getOpcode() {
 		return 2;
-	}
-
-	public String getFilename() {
-		return this.fileName;
 	}
 
 }

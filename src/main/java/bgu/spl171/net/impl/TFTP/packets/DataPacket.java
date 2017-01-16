@@ -26,10 +26,15 @@ public class DataPacket implements TFTPPacket {
 
 		FileOutputStream output = null;
 		try {
-			output = new FileOutputStream(this.filename, true);
+
+			output = new FileOutputStream(this.filename, true); // true for
+																// append
 			output.write(this.data);
+
 		} catch (IOException e) {
+
 			this.reponse = new ErrorPacket((short) 2);
+
 		} finally {
 			try {
 				output.close();
@@ -38,7 +43,7 @@ public class DataPacket implements TFTPPacket {
 			}
 		}
 
-		if (this.reponse == null) {
+		if (this.reponse == null) { // if note error
 			this.reponse = new AckPacket(this.blockNum);
 		}
 
