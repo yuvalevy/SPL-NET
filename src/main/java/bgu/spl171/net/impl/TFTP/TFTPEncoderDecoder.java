@@ -68,8 +68,6 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 				if (isEnder(nextByte)) {
 					return true;
 				}
-
-				pushByte(nextByte);
 			}
 
 			pushByte(nextByte);
@@ -112,12 +110,7 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 		 * @return true if packet is {6, 10} false otherwise
 		 */
 		private boolean isParamlessPackets() {
-
-			if ((this.opcode == 6) || (this.opcode == 10)) {
-				return true;
-			}
-
-			return false;
+			return (this.opcode == 6) || (this.opcode == 10);
 		}
 
 		private void pushByte(byte nextByte) {
