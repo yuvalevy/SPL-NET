@@ -74,6 +74,7 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 
 			if (opcode != 4) {
 				send(new ErrorPacket("Currently on READ state. Expected acknowledgment packet."));
+				backToRutine();
 			} else {
 				continueSending((AckPacket) packet);
 			}
@@ -83,6 +84,7 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 
 			if (opcode != 3) {
 				send(new ErrorPacket("Currently on WRITE state. Expected data packet."));
+				backToRutine();
 			} else {
 				continueWrite((DataPacket) packet);
 			}
@@ -111,14 +113,19 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 		this.connectionId = connectionId;
 	}
 
+	private void backToRutine() {
+		this.state = State.RUTINE;
+		this.writePath = "";
+		this.savedPacket = null;
+		this.currentBlockNumber = 0;
+	}
+
 	private void continueSending(AckPacket packet) {
 
 		if (packet.getBlockNum() != this.currentBlockNumber) {
 			send(new ErrorPacket((short) 0, "Expected " + this.currentBlockNumber + " block number and got "
 					+ packet.getBlockNum() + " block number."));
-			this.state = State.RUTINE;
-			this.savedPacket = null;
-			this.currentBlockNumber = 0;
+			backToRutine();
 		}
 
 		TFTPPacket nextResult = this.savedPacket.getNextResult();
@@ -126,9 +133,7 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 		if (nextResult != null) {
 			send(nextResult);
 		} else { // exiting from SEND state
-			this.state = State.RUTINE;
-			this.savedPacket = null;
-			this.currentBlockNumber = 0;
+			backToRutine();
 		}
 
 	}
@@ -142,7 +147,7 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 		send(nextResult);
 
 		if ((nextResult.getOpcode() == 5) || (packet.getSize() < 512)) {
-			this.state = State.RUTINE;
+
 			if (packet.getSize() < 512) {
 				files.put(this.writePath, FileStatus.COMPLETE);
 				sendBcast(this.writePath, '1');
@@ -151,6 +156,7 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 				((WritePacket) this.savedPacket).delete();
 			}
 
+			backToRutine();
 		}
 
 	}
