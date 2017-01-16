@@ -12,6 +12,12 @@ public class WritePacket implements TFTPPacket {
 		this.fileName = fileName;
 	}
 
+	public void delete() {
+
+		File file = new File("Files/" + this.fileName);
+		file.delete();
+	}
+
 	@Override
 	public void execute() {
 

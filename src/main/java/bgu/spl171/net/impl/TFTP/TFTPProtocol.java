@@ -146,6 +146,9 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 			if (packet.getSize() < 512) {
 				files.put(this.writePath, FileStatus.COMPLETE);
 				sendBcast(this.writePath, '1');
+			} else { // need to delete the rest written file because there was
+						// an error
+				((WritePacket) this.savedPacket).delete();
 			}
 
 		}
