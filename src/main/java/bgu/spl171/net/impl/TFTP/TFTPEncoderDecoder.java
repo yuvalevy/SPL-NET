@@ -27,11 +27,6 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 			return this.opcode;
 		}
 
-		boolean isWaitingForEnder() {
-			return (this.opcode == 1) || (this.opcode == 2) || (this.opcode == 5) || (this.opcode == 7)
-					|| (this.opcode == 8) || (this.opcode == 9);
-		}
-
 		boolean next(byte nextByte) {
 
 			boolean res = false;
@@ -49,12 +44,8 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 					}
 				}
 
-			} else {
-
-				if ((res = addByteByOpcode(nextByte))) {
-					initCounters();
-				}
-
+			} else if ((res = addByteByOpcode(nextByte))) {
+				initCounters();
 			}
 
 			return res;
@@ -63,10 +54,9 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 
 		private boolean addByteByOpcode(byte nextByte) {
 
-			if (isWaitingForEnder()) { // READ, WRITE, LOGIN, DELETE
-				if (isEnder(nextByte)) {
-					return true;
-				}
+			if (isWaitingForEnder() & isEnder(nextByte)) { // READ, WRITE,
+															// LOGIN, DELETE
+				return true;
 			}
 
 			pushByte(nextByte);
@@ -115,6 +105,11 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 			return (this.opcode > 10) || (this.opcode < 0);
 		}
 
+		private boolean isWaitingForEnder() {
+			return (this.opcode == 1) || (this.opcode == 2) || (this.opcode == 5) || (this.opcode == 7)
+					|| (this.opcode == 8) || (this.opcode == 9);
+		}
+
 		private void pushByte(byte nextByte) {
 			if (this.size >= this.bytes.length) {
 				this.bytes = Arrays.copyOf(this.bytes, this.size * 2);
@@ -137,7 +132,8 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 	public TFTPPacket decodeNextByte(byte nextByte) {
 
 		if (this.readingState.next(nextByte)) {
-			return decodePacket(this.readingState.get());
+			this.bytes = this.readingState.get();
+			return decodePacket();
 		}
 		return null;
 	}
@@ -195,7 +191,7 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 		return new ErrorPacket(code, new String(stringasbytes));
 	}
 
-	private TFTPPacket decodePacket(byte[] bytes) {
+	private TFTPPacket decodePacket() {
 
 		short opcode = this.readingState.getOpcode();
 		switch (opcode) {

@@ -7,26 +7,22 @@ import bgu.spl171.net.api.bidi.BidiMessagingProtocol;
 import bgu.spl171.net.api.bidi.Connections;
 import bgu.spl171.net.impl.TFTP.packets.*;
 
-enum State {
-	RUTINE, WRITE, SEND, DISCONNECTED
-}
-
 public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 
-	public enum FileStatus {
-		COMPLETE, INCOMPLETE
+	enum State {
+		RUTINE, WRITE, SEND, DISCONNECTED
 	}
 
 	private static ConcurrentHashMap<String, FileStatus> files;
 
-	private static ConcurrentHashMap<String, Integer> userNames;
+	private static ConcurrentHashMap<String, Integer> userNames = new ConcurrentHashMap<String, Integer>();
 	private Connections<TFTPPacket> connections;
 
 	private int connectionId;
 	private boolean shouldTerminate;
 
 	private State state;
-	private String userName;
+	private String username;
 	private String writePath;
 
 	private short currentBlockNumber;
@@ -36,26 +32,10 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 		this.state = State.DISCONNECTED;
 		this.shouldTerminate = false;
 		files = new ConcurrentHashMap<String, FileStatus>();
-		userNames = new ConcurrentHashMap<String, Integer>();
 	}
 
 	public Collection<Integer> getIds() {
 		return userNames.values();
-	}
-
-	public boolean login(int connectionId, String userName) {
-
-		int value = userNames.putIfAbsent(userName, connectionId);
-
-		if (value != connectionId) { // user with this username already exists
-			return false;
-		}
-
-		return true;
-	}
-
-	public void logout(String userName) {
-		userNames.remove(userName);
 	}
 
 	@Override
@@ -66,7 +46,6 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 		switch (this.state) {
 
 		case RUTINE:
-
 			rutine(packet);
 			break;
 
@@ -91,14 +70,8 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 			break;
 
 		case DISCONNECTED:
-
-			if (opcode == 7) {
-				login((LoginPacket) packet);
-			} else {
-				send(new ErrorPacket((short) 6));
-			}
+			disconnected(packet, opcode);
 			break;
-
 		}
 	}
 
@@ -123,8 +96,8 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 	private void continueSending(AckPacket packet) {
 
 		if (packet.getBlockNum() != this.currentBlockNumber) {
-			send(new ErrorPacket((short) 0, "Expected " + this.currentBlockNumber + " block number and got "
-					+ packet.getBlockNum() + " block number."));
+			send(new ErrorPacket("Expected " + this.currentBlockNumber + " block number and got " + packet.getBlockNum()
+					+ " block number."));
 			backToRutine();
 		}
 
@@ -163,6 +136,7 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 
 	private void delete(DeletePacket packet) {
 
+		packet.setFiles(files);
 		packet.execute();
 		String filename = packet.getFilename();
 
@@ -174,21 +148,34 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 		sendBcast(filename, '0');
 	}
 
+	private void disconnected(TFTPPacket packet, short opcode) {
+
+		if (opcode == 7) {
+			login((LoginPacket) packet);
+		} else if (isUndefindedOpcode(opcode)) {
+			send(new ErrorPacket((short) 4));
+		} else {
+			send(new ErrorPacket((short) 6));
+		}
+	}
+
+	private boolean isUndefindedOpcode(short opcode) {
+		return (opcode > 10) || (opcode < 0);
+	}
+
 	private void login(LoginPacket login) {
 
-		if (this.state == State.DISCONNECTED) {
+		if (this.state != State.DISCONNECTED) { // means user already logged in
 			send(new ErrorPacket((short) 7));
 			return;
 		}
 
-		this.userName = login.getUsername();
+		this.username = login.getUsername();
+		boolean tryLogin = userNames.putIfAbsent(this.username, this.connectionId) == this.connectionId;
 
-		boolean isAdded = login(this.connectionId, this.userName);
-		if (isAdded) {
-
+		if (tryLogin) {
 			send(new AckPacket((short) 0));
 			this.state = State.RUTINE;
-
 		} else {
 			send(new ErrorPacket((short) 7));
 		}
@@ -196,13 +183,11 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 
 	private void logout() {
 
-		logout(this.userName);
+		userNames.remove(this.username);
 		send(new AckPacket((short) 0));
 
 		this.state = State.DISCONNECTED;
 		this.shouldTerminate = true;
-		this.connections.disconnect(this.connectionId);
-
 	}
 
 	private void rutine(TFTPPacket packet) {
@@ -224,6 +209,10 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 			startSend(packet);
 			break;
 
+		case 7:
+			login((LoginPacket) packet);
+			break;
+
 		case 8:
 			delete((DeletePacket) packet);
 			break;
@@ -233,7 +222,7 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 			break;
 
 		default:
-			if ((opcode > 10) | (opcode < 0)) {
+			if (isUndefindedOpcode(opcode)) {
 				send(packet.getNextResult());
 			} else {
 				send(new ErrorPacket("Unexpected packet type " + opcode));

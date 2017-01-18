@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import bgu.spl171.net.api.MessageEncoderDecoder;
 import bgu.spl171.net.api.bidi.BidiMessagingProtocol;
 import bgu.spl171.net.api.bidi.ConnectionHandler;
+import bgu.spl171.net.api.bidi.Connections;
 
 public class NonBlockingConnectionHandler<T> implements ConnectionHandler<T> {
 
@@ -21,13 +22,16 @@ public class NonBlockingConnectionHandler<T> implements ConnectionHandler<T> {
 	private final Queue<ByteBuffer> writeQueue = new ConcurrentLinkedQueue<>();
 	private final SocketChannel chan;
 	private final Reactor<T> reactor;
+	private Connections<T> connections;
+	private int connectionId;
 
 	public NonBlockingConnectionHandler(MessageEncoderDecoder<T> reader, BidiMessagingProtocol<T> protocol,
-			SocketChannel chan, Reactor<T> reactor) {
+			SocketChannel chan, Reactor<T> reactor, Connections<T> connections) {
 		this.chan = chan;
 		this.encdec = reader;
 		this.protocol = protocol;
 		this.reactor = reactor;
+		this.connections = connections;
 	}
 
 	private static ByteBuffer leaseBuffer() {
@@ -48,6 +52,7 @@ public class NonBlockingConnectionHandler<T> implements ConnectionHandler<T> {
 	public void close() {
 		try {
 			this.chan.close();
+			this.connections.disconnect(this.connectionId);
 		} catch (IOException ex) {
 			ex.printStackTrace();
 		}

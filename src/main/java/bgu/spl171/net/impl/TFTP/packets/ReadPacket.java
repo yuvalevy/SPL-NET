@@ -7,7 +7,7 @@ import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.concurrent.ConcurrentHashMap;
 
-import bgu.spl171.net.impl.TFTP.TFTPProtocol.FileStatus;
+import bgu.spl171.net.impl.TFTP.FileStatus;
 
 public class ReadPacket implements TFTPPacket {
 

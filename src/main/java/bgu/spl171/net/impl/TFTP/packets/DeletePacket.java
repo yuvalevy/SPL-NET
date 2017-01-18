@@ -1,11 +1,15 @@
 package bgu.spl171.net.impl.TFTP.packets;
 
 import java.io.File;
+import java.util.concurrent.ConcurrentHashMap;
+
+import bgu.spl171.net.impl.TFTP.FileStatus;
 
 public class DeletePacket implements TFTPPacket {
 
 	private String filename;
 	private TFTPPacket response;
+	private ConcurrentHashMap<String, FileStatus> files;
 
 	public DeletePacket(String filename) {
 		this.filename = filename;
@@ -13,18 +17,33 @@ public class DeletePacket implements TFTPPacket {
 
 	@Override
 	public void execute() {
-		File file = new File(filename);
-		if (!file.exists()) {
+
+		FileStatus fileStatus = this.files.get(this.filename);
+		if ((fileStatus == null) | (fileStatus == FileStatus.INCOMPLETE)) {
 			this.response = new ErrorPacket((short) 1);
-		} else {
-			file.delete();
-			this.response = new AckPacket((short) 0);
+			return;
 		}
+
+		File file = new File(this.filename);
+
+		// if (!file.exists()) {
+		// this.response = new ErrorPacket((short) 1);
+		// } else {
+		if (file.delete()) {
+			this.response = new AckPacket((short) 0);
+		} else {
+			this.response = new ErrorPacket((short) 2);
+		}
+		// }
+	}
+
+	public String getFilename() {
+		return this.filename;
 	}
 
 	@Override
 	public TFTPPacket getNextResult() {
-		return response;
+		return this.response;
 	}
 
 	@Override
@@ -32,8 +51,8 @@ public class DeletePacket implements TFTPPacket {
 		return 8;
 	}
 
-	public String getFilename() {
-		return this.filename;
+	public void setFiles(ConcurrentHashMap<String, FileStatus> files) {
+		this.files = files;
 	}
 
 }

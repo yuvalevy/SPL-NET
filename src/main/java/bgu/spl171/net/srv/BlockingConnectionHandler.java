@@ -8,6 +8,7 @@ import java.net.Socket;
 import bgu.spl171.net.api.MessageEncoderDecoder;
 import bgu.spl171.net.api.bidi.BidiMessagingProtocol;
 import bgu.spl171.net.api.bidi.ConnectionHandler;
+import bgu.spl171.net.api.bidi.Connections;
 
 public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler<T> {
 
@@ -17,16 +18,21 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
 	private BufferedInputStream in;
 	private BufferedOutputStream out;
 	private volatile boolean connected = true;
+	private Connections<T> connections;
+	private int connectionId;
 
-	public BlockingConnectionHandler(Socket sock, MessageEncoderDecoder<T> reader, BidiMessagingProtocol<T> protocol) {
+	public BlockingConnectionHandler(Socket sock, MessageEncoderDecoder<T> reader, BidiMessagingProtocol<T> protocol,
+			Connections<T> connections) {
 		this.sock = sock;
 		this.encdec = reader;
 		this.protocol = protocol;
+		this.connections = connections;
 	}
 
 	@Override
 	public void close() throws IOException {
 		this.connected = false;
+		this.connections.disconnect(this.connectionId);
 		this.sock.close();
 	}
 
@@ -39,13 +45,12 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
 			this.in = new BufferedInputStream(sock.getInputStream());
 			this.out = new BufferedOutputStream(sock.getOutputStream());
 
-			while (!this.protocol.shouldTerminate() && this.connected && (read = this.in.read()) >= 0) {
+			while (!this.protocol.shouldTerminate() && this.connected && ((read = this.in.read()) >= 0)) {
 				T nextMessage = this.encdec.decodeNextByte((byte) read);
 				if (nextMessage != null) {
 					this.protocol.process(nextMessage);
 				}
 			}
-
 		} catch (IOException ex) {
 			ex.printStackTrace();
 		}

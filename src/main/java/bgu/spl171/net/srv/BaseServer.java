@@ -1,12 +1,12 @@
 package bgu.spl171.net.srv;
 
-import bgu.spl171.net.api.MessageEncoderDecoder;
-import bgu.spl171.net.api.bidi.BidiMessagingProtocol;
-
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.function.Supplier;
+
+import bgu.spl171.net.api.MessageEncoderDecoder;
+import bgu.spl171.net.api.bidi.BidiMessagingProtocol;
 
 public abstract class BaseServer<T> implements Server<T> {
 
@@ -27,10 +27,19 @@ public abstract class BaseServer<T> implements Server<T> {
 		this.connections = new ServerConnections<T>();
 	}
 
+	protected abstract void execute(BlockingConnectionHandler<T> handler);
+
+	@Override
+	public void close() throws IOException {
+		if (this.sock != null) {
+			this.sock.close();
+		}
+	}
+
 	@Override
 	public void serve() {
 
-		try (ServerSocket serverSock = new ServerSocket(port)) {
+		try (ServerSocket serverSock = new ServerSocket(this.port)) {
 
 			this.sock = serverSock; // just to be able to close
 
@@ -38,12 +47,13 @@ public abstract class BaseServer<T> implements Server<T> {
 
 				Socket clientSock = serverSock.accept();
 
-				BidiMessagingProtocol<T> protocol = protocolFactory.get();
-				BlockingConnectionHandler<T> handler = new BlockingConnectionHandler<T>(clientSock, encdecFactory.get(),
-						protocol);
+				BidiMessagingProtocol<T> protocol = this.protocolFactory.get();
+				BlockingConnectionHandler<T> handler = new BlockingConnectionHandler<T>(clientSock,
+						this.encdecFactory.get(), protocol, this.connections);
 
-				protocol.start(sock.hashCode(), connections);
-				connections.addConnection(handler, handler.hashCode());
+				int connectionId = this.sock.hashCode();
+				protocol.start(connectionId, this.connections);
+				this.connections.addConnection(handler, connectionId);
 
 				execute(handler);
 			}
@@ -52,13 +62,5 @@ public abstract class BaseServer<T> implements Server<T> {
 
 		System.out.println("server closed!!!");
 	}
-
-	@Override
-	public void close() throws IOException {
-		if (sock != null)
-			sock.close();
-	}
-
-	protected abstract void execute(BlockingConnectionHandler<T> handler);
 
 }
