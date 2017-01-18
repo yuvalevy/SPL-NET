@@ -23,13 +23,13 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 			return this.bytes;
 		}
 
-		int getOpcode() {
+		short getOpcode() {
 			return this.opcode;
 		}
 
 		boolean isWaitingForEnder() {
 			return (this.opcode == 1) || (this.opcode == 2) || (this.opcode == 5) || (this.opcode == 7)
-					|| (this.opcode == 8);
+					|| (this.opcode == 8) || (this.opcode == 9);
 		}
 
 		boolean next(byte nextByte) {
@@ -44,7 +44,7 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 				if (this.opsize == 2) { // opcode now found
 					this.opcode = bytesToShort(this.opcArray, 0);
 
-					if ((res = isParamlessPackets())) {
+					if ((res = isParamlessPacket())) {
 						initCounters();
 					}
 				}
@@ -64,7 +64,6 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 		private boolean addByteByOpcode(byte nextByte) {
 
 			if (isWaitingForEnder()) { // READ, WRITE, LOGIN, DELETE
-
 				if (isEnder(nextByte)) {
 					return true;
 				}
@@ -80,8 +79,7 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 				return this.size == 2;
 			}
 
-			// problem...
-			return false;
+			return isUnexpectedPacket();
 		}
 
 		private void initCounters() {
@@ -109,8 +107,12 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 		 *
 		 * @return true if packet is {6, 10} false otherwise
 		 */
-		private boolean isParamlessPackets() {
+		private boolean isParamlessPacket() {
 			return (this.opcode == 6) || (this.opcode == 10);
+		}
+
+		private boolean isUnexpectedPacket() {
+			return (this.opcode > 10) || (this.opcode < 0);
 		}
 
 		private void pushByte(byte nextByte) {
@@ -134,9 +136,7 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 	@Override
 	public TFTPPacket decodeNextByte(byte nextByte) {
 
-		boolean isDone = false;
-		isDone = this.readingState.next(nextByte);
-		if (isDone) {
+		if (this.readingState.next(nextByte)) {
 			return decodePacket(this.readingState.get());
 		}
 		return null;
@@ -148,9 +148,8 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 	@Override
 	public byte[] encode(TFTPPacket message) {
 
-		byte[] $ = null;
-
 		short opcode = message.getOpcode();
+
 		switch (opcode) {
 
 		case 3: // DATA
@@ -163,7 +162,7 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 			return encodeBcast((BCastPacket) message);
 		}
 
-		return $;
+		return new byte[0];
 	}
 
 	private short bytesToShort(byte[] byteArr, int start) {
@@ -175,6 +174,12 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 	private TFTPPacket decodeAck() {
 		short blocknum = bytesToShort(this.bytes, 0);
 		return new AckPacket(blocknum);
+	}
+
+	private TFTPPacket decodeBCast() {
+		char added = (char) this.bytes[0];
+		byte[] stringasbytes = Arrays.copyOfRange(this.bytes, 1, this.bytes.length - 2);
+		return new BCastPacket(new String(stringasbytes), added);
 	}
 
 	private TFTPPacket decodeData() {
@@ -192,7 +197,8 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 
 	private TFTPPacket decodePacket(byte[] bytes) {
 
-		switch (this.readingState.getOpcode()) {
+		short opcode = this.readingState.getOpcode();
+		switch (opcode) {
 
 		case 1: // READ
 			return getInstanceForStringParam(ReadPacket.class);
@@ -204,13 +210,19 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 			return decodeAck();
 		case 5: // ERROR
 			return decodeError();
+		case 6: // DIR LIST
+			return new DirListPacket();
 		case 7:// LOGIN
 			return getInstanceForStringParam(LoginPacket.class);
 		case 8: // DETELE
 			return getInstanceForStringParam(DeletePacket.class);
+		case 9: // BCAST
+			return decodeBCast();
+		case 10: // DISCONNECT
+			return new DisconnectPacket();
 		}
 
-		return null;
+		return new UndefindedPacket(opcode);
 	}
 
 	private byte[] encodeAck(AckPacket message) {

@@ -67,7 +67,7 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 
 		case RUTINE:
 
-			rutine(packet, opcode);
+			rutine(packet);
 			break;
 
 		case SEND:
@@ -205,8 +205,9 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 
 	}
 
-	private void rutine(TFTPPacket packet, short opcode) {
+	private void rutine(TFTPPacket packet) {
 
+		short opcode = packet.getOpcode();
 		switch (opcode) {
 
 		case 1:
@@ -233,7 +234,7 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 
 		default:
 			if ((opcode > 10) | (opcode < 0)) {
-				send(new ErrorPacket((short) 4));
+				send(packet.getNextResult());
 			} else {
 				send(new ErrorPacket("Unexpected packet type " + opcode));
 			}
