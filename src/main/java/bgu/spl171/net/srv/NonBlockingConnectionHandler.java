@@ -26,12 +26,13 @@ public class NonBlockingConnectionHandler<T> implements ConnectionHandler<T> {
 	private int connectionId;
 
 	public NonBlockingConnectionHandler(MessageEncoderDecoder<T> reader, BidiMessagingProtocol<T> protocol,
-			SocketChannel chan, Reactor<T> reactor, Connections<T> connections) {
+			SocketChannel chan, Reactor<T> reactor, Connections<T> connections, int connectionId) {
 		this.chan = chan;
 		this.encdec = reader;
 		this.protocol = protocol;
 		this.reactor = reactor;
 		this.connections = connections;
+		this.connectionId = connectionId;
 	}
 
 	private static ByteBuffer leaseBuffer() {

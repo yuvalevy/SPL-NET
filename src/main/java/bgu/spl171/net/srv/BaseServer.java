@@ -48,10 +48,11 @@ public abstract class BaseServer<T> implements Server<T> {
 				Socket clientSock = serverSock.accept();
 
 				BidiMessagingProtocol<T> protocol = this.protocolFactory.get();
-				BlockingConnectionHandler<T> handler = new BlockingConnectionHandler<T>(clientSock,
-						this.encdecFactory.get(), protocol, this.connections);
 
 				int connectionId = this.sock.hashCode();
+				BlockingConnectionHandler<T> handler = new BlockingConnectionHandler<T>(clientSock,
+						this.encdecFactory.get(), protocol, this.connections, connectionId);
+
 				protocol.start(connectionId, this.connections);
 				this.connections.addConnection(handler, connectionId);
 

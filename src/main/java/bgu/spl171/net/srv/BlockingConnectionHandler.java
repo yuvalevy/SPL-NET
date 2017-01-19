@@ -22,11 +22,12 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
 	private int connectionId;
 
 	public BlockingConnectionHandler(Socket sock, MessageEncoderDecoder<T> reader, BidiMessagingProtocol<T> protocol,
-			Connections<T> connections) {
+			Connections<T> connections, int connectionId) {
 		this.sock = sock;
 		this.encdec = reader;
 		this.protocol = protocol;
 		this.connections = connections;
+		this.connectionId = connectionId;
 	}
 
 	@Override

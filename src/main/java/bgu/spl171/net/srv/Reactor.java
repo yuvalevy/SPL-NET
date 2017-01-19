@@ -101,10 +101,11 @@ public class Reactor<T> implements Server<T> {
 		SocketChannel clientChan = serverChan.accept();
 		clientChan.configureBlocking(false);
 		BidiMessagingProtocol<T> protocol = this.protocolFactory.get();
-		final NonBlockingConnectionHandler<T> handler = new NonBlockingConnectionHandler<T>(this.readerFactory.get(),
-				protocol, clientChan, this, this.connections);
-
 		int connectionId = clientChan.hashCode();
+
+		final NonBlockingConnectionHandler<T> handler = new NonBlockingConnectionHandler<T>(this.readerFactory.get(),
+				protocol, clientChan, this, this.connections, connectionId);
+
 		protocol.start(connectionId, this.connections);
 		this.connections.addConnection(handler, connectionId);
 
