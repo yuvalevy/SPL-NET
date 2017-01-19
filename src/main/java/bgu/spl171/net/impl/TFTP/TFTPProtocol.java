@@ -144,7 +144,6 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 		TFTPPacket msg = packet.getNextResult();
 		send(msg);
 
-		files.remove(filename);
 		sendBcast(filename, '0');
 	}
 

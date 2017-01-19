@@ -26,15 +26,15 @@ public class DeletePacket implements TFTPPacket {
 
 		File file = new File(this.filename);
 
-		// if (!file.exists()) {
-		// this.response = new ErrorPacket((short) 1);
-		// } else {
-		if (file.delete()) {
-			this.response = new AckPacket((short) 0);
-		} else {
-			this.response = new ErrorPacket((short) 2);
+		synchronized (this.files) {
+			if (file.delete()) {
+				this.files.remove(this.filename);
+				this.response = new AckPacket((short) 0);
+			} else {
+				this.response = new ErrorPacket((short) 2);
+			}
 		}
-		// }
+
 	}
 
 	public String getFilename() {
