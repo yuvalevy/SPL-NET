@@ -48,7 +48,7 @@ public abstract class BaseServer<T> implements Server<T> {
 				Socket clientSock = serverSock.accept();
 
 				BidiMessagingProtocol<T> protocol = this.protocolFactory.get();
-
+				System.out.println("client connected");
 				int connectionId = this.sock.hashCode();
 				BlockingConnectionHandler<T> handler = new BlockingConnectionHandler<T>(clientSock,
 						this.encdecFactory.get(), protocol, this.connections, connectionId);
@@ -59,6 +59,7 @@ public abstract class BaseServer<T> implements Server<T> {
 				execute(handler);
 			}
 		} catch (IOException ex) {
+			ex.printStackTrace();
 		}
 
 		System.out.println("server closed!!!");

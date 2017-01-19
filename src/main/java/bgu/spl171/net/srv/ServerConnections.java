@@ -21,7 +21,7 @@ public class ServerConnections<T> implements Connections<T> {
 	 * @return Connection was added - true, otherwise false
 	 */
 	public boolean addConnection(ConnectionHandler<T> handler, int connectionId) {
-		return this.connections.putIfAbsent(connectionId, handler).equals(handler);
+		return this.connections.putIfAbsent(connectionId, handler) == null;
 	}
 
 	@Override

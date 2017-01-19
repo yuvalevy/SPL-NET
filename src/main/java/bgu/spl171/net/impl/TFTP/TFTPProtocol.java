@@ -169,8 +169,11 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 			return;
 		}
 
+		boolean tryLogin = false;
 		this.username = login.getUsername();
-		boolean tryLogin = userNames.putIfAbsent(this.username, this.connectionId) == this.connectionId;
+		if (userNames.putIfAbsent(this.username, this.connectionId) == null) {
+			tryLogin = true;
+		}
 
 		if (tryLogin) {
 			send(new AckPacket((short) 0));

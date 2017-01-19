@@ -19,6 +19,13 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 
 		private short datasize;
 
+		public ReadingState() {
+			this.opcode = -1;
+			this.opcArray = new byte[2];
+			this.bytes = new byte[1024];
+			initCounters();
+		}
+
 		byte[] get() {
 			return this.bytes;
 		}
@@ -73,7 +80,6 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 		}
 
 		private void initCounters() {
-			this.opcode = -1;
 			this.size = 0;
 			this.opsize = 0;
 		}
