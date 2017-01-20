@@ -1,5 +1,6 @@
 package bgu.spl171.net.impl.TFTP;
 
+import java.io.File;
 import java.util.Collection;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -13,8 +14,7 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 		RUTINE, WRITE, SEND, DISCONNECTED
 	}
 
-	private static ConcurrentHashMap<String, FileStatus> files;
-
+	private static ConcurrentHashMap<String, FileStatus> files = TFTPProtocol1();
 	private static ConcurrentHashMap<String, Integer> userNames = new ConcurrentHashMap<String, Integer>();
 	private Connections<TFTPPacket> connections;
 
@@ -31,7 +31,18 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 	public TFTPProtocol() {
 		this.state = State.DISCONNECTED;
 		this.shouldTerminate = false;
-		files = new ConcurrentHashMap<String, FileStatus>();
+	}
+
+	private static ConcurrentHashMap<String, FileStatus> TFTPProtocol1() {
+
+		ConcurrentHashMap<String, FileStatus> currentDirFies = new ConcurrentHashMap<String, FileStatus>();
+
+		for (File file : new File("Files/").listFiles()) {
+			currentDirFies.put(file.getName(), FileStatus.COMPLETE);
+		}
+
+		return currentDirFies;
+
 	}
 
 	public Collection<Integer> getIds() {
@@ -41,6 +52,7 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 	@Override
 	public void process(TFTPPacket packet) {
 
+		System.out.println("RECIVE: " + packet);
 		short opcode = packet.getOpcode();
 
 		switch (this.state) {
@@ -99,12 +111,17 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 			send(new ErrorPacket("Expected " + this.currentBlockNumber + " block number and got " + packet.getBlockNum()
 					+ " block number."));
 			backToRutine();
+			return;
 		}
 
 		TFTPPacket nextResult = this.savedPacket.getNextResult();
 
 		if (nextResult != null) {
-			send(nextResult);
+
+			short nextblocknum = (((DataPacket) nextResult).getBlockNum());
+			System.out.println("sending now. expecting ack with bn " + nextblocknum);
+			send(nextResult, nextblocknum);
+
 		} else { // exiting from SEND state
 			backToRutine();
 		}
@@ -144,7 +161,9 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 		TFTPPacket msg = packet.getNextResult();
 		send(msg);
 
-		sendBcast(filename, '0');
+		if (msg.getOpcode() != 5) {
+			sendBcast(filename, '0');
+		}
 	}
 
 	private void disconnected(TFTPPacket packet, short opcode) {
@@ -198,6 +217,8 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 		switch (opcode) {
 
 		case 1:
+			ReadPacket read = (ReadPacket) packet;
+			read.setFiles(files);
 			startSend(packet);
 			break;
 
@@ -239,8 +260,18 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 	 * @param packet
 	 */
 	private void send(TFTPPacket packet) {
+		send(packet, (short) 0);
+	}
+
+	/**
+	 * assuming packet != null
+	 *
+	 * @param packet
+	 * @param nextblocknum
+	 */
+	private void send(TFTPPacket packet, short nextblocknum) {
 		this.connections.send(this.connectionId, packet);
-		this.currentBlockNumber = 1;
+		this.currentBlockNumber = nextblocknum;
 	}
 
 	/**
@@ -262,11 +293,13 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 
 		packet.execute();
 		TFTPPacket result = packet.getNextResult();
+		short nextblock = 0;
 		if (result.getOpcode() != 5) {
 			this.state = State.SEND;
 			this.savedPacket = packet;
+			nextblock = ((DataPacket) result).getBlockNum();
 		}
-		send(result);
+		send(result, nextblock);
 	}
 
 	private void write(WritePacket packet) {

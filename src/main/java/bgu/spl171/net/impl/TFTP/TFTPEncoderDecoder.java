@@ -17,6 +17,7 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 		private short opcode;
 		private int size;
 
+		private int finalsize;
 		private short datasize;
 
 		public ReadingState() {
@@ -59,11 +60,27 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 
 		}
 
+		public int getSize() {
+			return this.finalsize;
+		}
+
 		private boolean addByteByOpcode(byte nextByte) {
 
-			if (isWaitingForEnder() & isEnder(nextByte)) { // READ, WRITE,
-															// LOGIN, DELETE
+			if (isOnlyWaitingForEnder() & isEnder(nextByte)) { // READ, WRITE,
+																// LOGIN, DELETE
 				return true;
+			}
+
+			if (this.opcode == 5) { // error
+				if (this.size >= 2) {
+					return isEnder(nextByte);
+				}
+			}
+
+			if (this.opcode == 9) { // BCAST
+				if (this.size >= 1) {
+					return isEnder(nextByte);
+				}
 			}
 
 			pushByte(nextByte);
@@ -80,6 +97,7 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 		}
 
 		private void initCounters() {
+			this.finalsize = this.size;
 			this.size = 0;
 			this.opsize = 0;
 		}
@@ -97,6 +115,10 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 
 		}
 
+		private boolean isOnlyWaitingForEnder() {
+			return (this.opcode == 1) || (this.opcode == 2) || (this.opcode == 7) || (this.opcode == 8);
+		}
+
 		/**
 		 * Checks id the current opcode (this.opcode) is one of {6, 10}, and if
 		 * so, returns true.
@@ -111,11 +133,6 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 			return (this.opcode > 10) || (this.opcode < 0);
 		}
 
-		private boolean isWaitingForEnder() {
-			return (this.opcode == 1) || (this.opcode == 2) || (this.opcode == 5) || (this.opcode == 7)
-					|| (this.opcode == 8) || (this.opcode == 9);
-		}
-
 		private void pushByte(byte nextByte) {
 			if (this.size >= this.bytes.length) {
 				this.bytes = Arrays.copyOf(this.bytes, this.size * 2);
@@ -123,12 +140,12 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 
 			this.bytes[this.size++] = nextByte;
 		}
-
 	}
 
 	private ReadingState readingState;
 	private byte[] bytes;
 	private final byte ENDER = '\0';
+	private int size;
 
 	public TFTPEncoderDecoder() {
 		this.readingState = new ReadingState();
@@ -137,8 +154,13 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 	@Override
 	public TFTPPacket decodeNextByte(byte nextByte) {
 
+		System.out.println("byte:" + nextByte);
+
 		if (this.readingState.next(nextByte)) {
-			this.bytes = this.readingState.get();
+			byte[] tmp = this.readingState.get();
+			this.size = this.readingState.getSize();
+			this.bytes = new byte[this.size];
+			System.arraycopy(tmp, 0, this.bytes, 0, this.size);
 			return decodePacket();
 		}
 		return null;
@@ -185,15 +207,17 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 	}
 
 	private TFTPPacket decodeData() {
+		short datasize = bytesToShort(this.bytes, 0);
 		short blocknum = bytesToShort(this.bytes, 2);
-		byte[] data = null;
-		System.arraycopy(this.bytes, 4, data, 0, this.bytes.length);
+
+		byte[] data = new byte[datasize];
+		System.arraycopy(this.bytes, 4, data, 0, datasize);
 		return new DataPacket(blocknum, data);
 	}
 
 	private ErrorPacket decodeError() {
 		short code = bytesToShort(this.bytes, 0);
-		byte[] stringasbytes = Arrays.copyOfRange(this.bytes, 2, this.bytes.length - 2);
+		byte[] stringasbytes = Arrays.copyOfRange(this.bytes, 2, this.size);
 		return new ErrorPacket(code, new String(stringasbytes));
 	}
 
@@ -248,7 +272,7 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 
 		byte[] filename = message.getFilename().getBytes();
 
-		int packetSize = 6 + filename.length;
+		int packetSize = 4 + filename.length;
 		byte[] $ = new byte[packetSize];
 
 		// opcode
@@ -301,7 +325,7 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 
 		String errorMsg = message.getMsg();
 
-		int packetSize = 6 + errorMsg.length();
+		int packetSize = 5 + errorMsg.length();
 		byte[] $ = new byte[packetSize];
 
 		// opcode
@@ -315,7 +339,8 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 		$[3] = temp[1];
 
 		// filename
-		System.arraycopy(errorMsg, 0, $, 4, errorMsg.length());
+		byte[] msgBytes = errorMsg.getBytes();
+		System.arraycopy(msgBytes, 0, $, 4, msgBytes.length);
 
 		// zero byte
 		$[packetSize - 1] = this.ENDER;
@@ -334,8 +359,7 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 	@SuppressWarnings("unchecked")
 	private <T extends TFTPPacket> T getInstanceForStringParam(Class<T> classObj) {
 
-		String param = new String(this.bytes);
-
+		String param = new String(this.bytes, 0, this.size);
 		try {
 			return (T) classObj.getConstructors()[0].newInstance(param);
 		} catch (InstantiationException | IllegalAccessException | IllegalArgumentException | InvocationTargetException

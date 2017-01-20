@@ -39,21 +39,26 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
 
 	@Override
 	public void run() {
+		try (BlockingConnectionHandler<T> con = this) {
+			try (Socket sock = this.sock) { // just for automatic closing
+				int read;
 
-		try (Socket sock = this.sock) { // just for automatic closing
-			int read;
+				this.in = new BufferedInputStream(sock.getInputStream());
+				this.out = new BufferedOutputStream(sock.getOutputStream());
 
-			this.in = new BufferedInputStream(sock.getInputStream());
-			this.out = new BufferedOutputStream(sock.getOutputStream());
-
-			while (!this.protocol.shouldTerminate() && this.connected && ((read = this.in.read()) >= 0)) {
-				T nextMessage = this.encdec.decodeNextByte((byte) read);
-				if (nextMessage != null) {
-					this.protocol.process(nextMessage);
+				while (!this.protocol.shouldTerminate() && this.connected && ((read = this.in.read()) >= 0)) {
+					T nextMessage = this.encdec.decodeNextByte((byte) read);
+					if (nextMessage != null) {
+						this.protocol.process(nextMessage);
+					}
 				}
+				System.out.println("'");
+			} catch (IOException ex) {
+				ex.printStackTrace();
 			}
-		} catch (IOException ex) {
-			ex.printStackTrace();
+		} catch (IOException e) {
+			System.out.println("closing connection handler");
+			e.printStackTrace();
 		}
 
 	}
@@ -64,7 +69,9 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
 		if (msg != null) {
 
 			try {
-				this.out.write(this.encdec.encode(msg));
+				System.out.println("SENDS: " + msg);
+				byte[] encode = this.encdec.encode(msg);
+				this.out.write(encode);
 				this.out.flush();
 			} catch (IOException e) {
 				e.printStackTrace();

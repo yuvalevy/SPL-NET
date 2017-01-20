@@ -24,7 +24,7 @@ public class DeletePacket implements TFTPPacket {
 			return;
 		}
 
-		File file = new File(this.filename);
+		File file = new File("Files/" + this.filename);
 
 		synchronized (this.files) {
 			if (file.delete()) {

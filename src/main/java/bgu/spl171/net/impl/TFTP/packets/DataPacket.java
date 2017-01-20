@@ -24,23 +24,12 @@ public class DataPacket implements TFTPPacket {
 	@Override
 	public void execute() {
 
-		FileOutputStream output = null;
-		try {
-
-			output = new FileOutputStream(this.filename, true); // true for
-																// append
+		try (FileOutputStream output = new FileOutputStream(this.filename, true)) {
 			output.write(this.data);
+			output.flush();
 
 		} catch (IOException e) {
-
 			this.reponse = new ErrorPacket((short) 2);
-
-		} finally {
-			try {
-				output.close();
-			} catch (IOException e) {
-				this.reponse = new ErrorPacket((short) 2);
-			}
 		}
 
 		if (this.reponse == null) { // if note error
@@ -72,7 +61,7 @@ public class DataPacket implements TFTPPacket {
 	}
 
 	public void setFilename(String filename) {
-		this.filename = filename;
+		this.filename = "Files/" + filename;
 	}
 
 }

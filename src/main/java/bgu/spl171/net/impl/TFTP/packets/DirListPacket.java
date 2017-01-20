@@ -24,7 +24,6 @@ public class DirListPacket implements TFTPPacket {
 	@Override
 	public void execute() {
 		fileStringByteByStatus(FileStatus.COMPLETE);
-
 	}
 
 	@Override
@@ -41,8 +40,9 @@ public class DirListPacket implements TFTPPacket {
 			nextPacket = createDataPacket(this.blockNum, this.start);
 		}
 		this.start = this.start + this.MAXPACKETSIZE;
-		this.blockNum++;
+		System.out.println("now expecting block " + this.blockNum);
 
+		this.blockNum++;
 		return nextPacket;
 
 	}
@@ -64,7 +64,6 @@ public class DirListPacket implements TFTPPacket {
 		}
 
 		byte[] data = Arrays.copyOfRange(this.completedFiles, start, start + dataSize);
-
 		DataPacket dataPacket = new DataPacket(blockNum, data);
 
 		return dataPacket;
@@ -80,6 +79,7 @@ public class DirListPacket implements TFTPPacket {
 			}
 		}
 		this.completedFiles = filesString.getBytes();
+		this.blockNum = 1;
 	}
 
 }

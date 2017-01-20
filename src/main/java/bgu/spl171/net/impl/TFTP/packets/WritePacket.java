@@ -21,7 +21,11 @@ public class WritePacket implements TFTPPacket {
 	@Override
 	public void execute() {
 
-		File file = new File("Files/" + this.fileName);
+		File dir = new File("Files");
+		dir.mkdirs();
+		String string = "Files/" + this.fileName;
+		System.out.println("file name: " + string);
+		File file = new File(string);
 
 		try {
 
