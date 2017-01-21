@@ -8,7 +8,20 @@ public class ReactorMain {
 
 	public static void main(String[] args) {
 
-		Server<?> f = Server.reactor(1, 7777, () -> new TFTPProtocol(), () -> new TFTPEncoderDecoder());
+		if (args.length != 1) {
+			System.out.println("Exspecting only port number.");
+			return;
+		}
+		int port = 0;
+
+		try {
+			port = Integer.parseInt(args[0]);
+		} catch (Exception e) {
+			System.out.println("Exspecting only port number.");
+			return;
+		}
+
+		Server<?> f = Server.reactor(1, port, () -> new TFTPProtocol(), () -> new TFTPEncoderDecoder());
 		f.serve();
 
 	}
