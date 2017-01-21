@@ -37,6 +37,11 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 
 		ConcurrentHashMap<String, FileStatus> currentDirFies = new ConcurrentHashMap<String, FileStatus>();
 
+
+		File dir = new File("Files");
+		dir.mkdirs();
+
+
 		for (File file : new File("Files/").listFiles()) {
 			currentDirFies.put(file.getName(), FileStatus.COMPLETE);
 		}
