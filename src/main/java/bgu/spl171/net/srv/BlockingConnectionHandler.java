@@ -52,12 +52,10 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
 						this.protocol.process(nextMessage);
 					}
 				}
-				System.out.println("'");
 			} catch (IOException ex) {
 				ex.printStackTrace();
 			}
 		} catch (IOException e) {
-			System.out.println("closing connection handler");
 			e.printStackTrace();
 		}
 
@@ -69,7 +67,6 @@ public class BlockingConnectionHandler<T> implements Runnable, ConnectionHandler
 		if (msg != null) {
 
 			try {
-				System.out.println("SENDS: " + msg);
 				byte[] encode = this.encdec.encode(msg);
 				this.out.write(encode);
 				this.out.flush();

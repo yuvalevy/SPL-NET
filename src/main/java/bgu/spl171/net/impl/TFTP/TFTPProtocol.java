@@ -37,10 +37,8 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 
 		ConcurrentHashMap<String, FileStatus> currentDirFies = new ConcurrentHashMap<String, FileStatus>();
 
-
 		File dir = new File("Files");
 		dir.mkdirs();
-
 
 		for (File file : new File("Files/").listFiles()) {
 			currentDirFies.put(file.getName(), FileStatus.COMPLETE);
@@ -57,7 +55,6 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 	@Override
 	public void process(TFTPPacket packet) {
 
-		System.out.println("RECIVE: " + packet);
 		short opcode = packet.getOpcode();
 
 		switch (this.state) {
@@ -124,7 +121,6 @@ public class TFTPProtocol implements BidiMessagingProtocol<TFTPPacket> {
 		if (nextResult != null) {
 
 			short nextblocknum = (((DataPacket) nextResult).getBlockNum());
-			System.out.println("sending now. expecting ack with bn " + nextblocknum);
 			send(nextResult, nextblocknum);
 
 		} else { // exiting from SEND state

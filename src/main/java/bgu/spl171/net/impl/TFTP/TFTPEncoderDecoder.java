@@ -154,8 +154,6 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 	@Override
 	public TFTPPacket decodeNextByte(byte nextByte) {
 
-		System.out.println("byte:" + nextByte);
-
 		if (this.readingState.next(nextByte)) {
 			byte[] tmp = this.readingState.get();
 			this.size = this.readingState.getSize();

@@ -40,7 +40,6 @@ public class DirListPacket implements TFTPPacket {
 			nextPacket = createDataPacket(this.blockNum, this.start);
 		}
 		this.start = this.start + this.MAXPACKETSIZE;
-		System.out.println("now expecting block " + this.blockNum);
 
 		this.blockNum++;
 		return nextPacket;

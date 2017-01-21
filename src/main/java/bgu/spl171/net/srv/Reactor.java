@@ -56,7 +56,6 @@ public class Reactor<T> implements Server<T> {
 	public void serve() {
 		this.selectorThread = Thread.currentThread();
 
-		System.out.println("server is waiting for a client!!!");
 		try (Selector selector = Selector.open(); ServerSocketChannel serverSock = ServerSocketChannel.open()) {
 
 			this.selector = selector; // just to be able to close
