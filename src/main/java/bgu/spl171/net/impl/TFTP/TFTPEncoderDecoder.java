@@ -202,7 +202,7 @@ public class TFTPEncoderDecoder implements MessageEncoderDecoder<TFTPPacket> {
 
 	private TFTPPacket decodeBCast() {
 		char added = (char) this.bytes[0];
-		byte[] stringasbytes = Arrays.copyOfRange(this.bytes, 1, this.bytes.length - 2);
+		byte[] stringasbytes = Arrays.copyOfRange(this.bytes, 1, this.bytes.length);
 		return new BCastPacket(new String(stringasbytes), added);
 	}
 
